@@ -22,8 +22,8 @@ const client = new MongoClient(uri, {
 // api end points
 async function run() {
   try {
-    await client.connect();
-    console.log("You successfully connected to MongoDB!");
+    // await client.connect();
+    // console.log("You successfully connected to MongoDB!");
 
     // database and collections
     const db = client.db("TodoApp");
