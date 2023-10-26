@@ -54,16 +54,20 @@ async function run() {
       }
     });
 
-    // post endpoint for insert a todo.
-    app.post("/todos", async (req, res) => {
-      const data = req.body;
-      if (!data) {
+    // put endpoint for insert a todo in user todos array.
+    app.put("/todo", async (req, res) => {
+      const { uid, todo } = req.body;
+      if (!uid || !todo) {
         res.status(400).send({
-          message: "Please provide data",
+          message: "Please provide uid and todo",
         });
       }
+      const filter = { uid: uid };
+      const update = { $push: { todos: { todo } } };
+      console.log(filter, update);
+
       try {
-        const result = await todosCollection.insertOne(data);
+        const result = await usersCollection.updateOne(filter, update);
         if (result.acknowledged) {
           res.status(201).send({
             message: "Item added successfully",
