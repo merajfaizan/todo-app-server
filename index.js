@@ -28,6 +28,31 @@ async function run() {
     // database and collections
     const db = client.db("TodoApp");
     const todosCollection = db.collection("todos");
+    const usersCollection = db.collection("users");
+
+    // post endpoint for insert a user
+    app.post("/users", async (req, res) => {
+      const data = req.body;
+      if (!data) {
+        res.status(400).send({
+          message: "Please provide user data",
+        });
+      }
+      try {
+        const result = await usersCollection.insertOne(data);
+        if (result.acknowledged) {
+          res.status(201).send({
+            message: "Registered successfully",
+            data: result.insertedId,
+          });
+        }
+      } catch (error) {
+        res.status(500).send({
+          message:
+            "there is an error on internal server, registration unsuccessful.",
+        });
+      }
+    });
 
     // post endpoint for insert a todo.
     app.post("/todos", async (req, res) => {
