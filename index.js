@@ -30,6 +30,31 @@ async function run() {
     const todosCollection = db.collection("todos");
     const usersCollection = db.collection("users");
 
+    // get endpoint for get a user via user's uid
+    app.get("/users/:uid", async (req, res) => {
+      const { uid } = req.params;
+      if (!uid) {
+        res.status(400).send({
+          message: "Please provide uid",
+        });
+      }
+
+      try {
+        const result = await usersCollection.findOne({ uid: uid });
+        if (result) {
+          res.status(200).send({
+            message: "user found",
+            data: result,
+          });
+        }
+      } catch (error) {
+        res.status(500).send({
+          message:
+            "there is an error on internal server, user getting unsuccessful.",
+        });
+      }
+    });
+
     // post endpoint for insert a user
     app.post("/users", async (req, res) => {
       const data = req.body;
@@ -56,14 +81,17 @@ async function run() {
 
     // put endpoint for insert a todo in user todos array.
     app.put("/todo", async (req, res) => {
-      const { uid, todo } = req.body;
-      if (!uid || !todo) {
+      const {
+        uid,
+        todoData: { id, todo },
+      } = req.body;
+      if (!uid || !id || !todo) {
         res.status(400).send({
           message: "Please provide uid and todo",
         });
       }
       const filter = { uid: uid };
-      const update = { $push: { todos: { todo } } };
+      const update = { $push: { todos: { id, todo } } };
       console.log(filter, update);
 
       try {
@@ -71,7 +99,6 @@ async function run() {
         if (result.acknowledged) {
           res.status(201).send({
             message: "Item added successfully",
-            data: result.insertedId,
           });
         }
       } catch (error) {
@@ -81,11 +108,13 @@ async function run() {
       }
     });
 
-    // get endpoint for get all the todos.
-    app.get("/todos", async (req, res) => {
+    // get endpoint for get all the todos from user.
+    app.get("/todos/:uid", async (req, res) => {
+      const uid = req.params.uid;
+      const query = { uid: uid };
       try {
-        const result = await todosCollection.find({}).toArray();
-        res.status(200).send(result);
+        const result = await usersCollection.findOne(query);
+        res.status(200).send(result.todos);
       } catch (error) {
         res.status(500).send({
           message: "there is an error on internal server.",
@@ -94,18 +123,20 @@ async function run() {
     });
 
     // delete endpoint for delete a todo.
-    app.delete("/todos/:id", async (req, res) => {
-      const id = req.params.id;
-      if (!id) {
+    app.delete("/todos/:uid", async (req, res) => {
+      const uid = req.params.uid;
+      const todoId = req.body;
+
+      if (!uid || !todoId) {
         res.status(400).send({
-          message: "Please provide id",
+          message: "Please provide uid and todoId",
         });
       }
+      const filter = { uid: uid };
+      const update = { $pull: { todos: { id: todoId } } };
       try {
-        const result = await todosCollection.deleteOne({
-          _id: new ObjectId(id),
-        });
-        if (result.deletedCount === 1) {
+        const result = await usersCollection.updateOne(filter, update);
+        if (result.matchedCount === 1) {
           res.status(200).send({
             message: "Item deleted successfully",
           });
@@ -118,18 +149,20 @@ async function run() {
     });
 
     // get endpoint for get a todo.
-    app.get("/todos/:id", async (req, res) => {
-      const id = req.params.id;
-      if (!id) {
+    app.get("/todo", async (req, res) => {
+      const id = req.query.id;
+      const uid = req.query.uid;
+      if (!id || !uid) {
         res.status(400).send({
-          message: "Please provide id",
+          message: "Please provide id and uid",
         });
       }
+      const user = { uid: uid };
+
       try {
-        const result = await todosCollection.findOne({
-          _id: new ObjectId(id),
-        });
-        res.status(200).send(result);
+        const result = await usersCollection.findOne(user);
+        const todo = result.todos.find((todo) => todo.id == id);
+        res.status(200).send(todo);
       } catch (error) {
         res.status(500).send({
           message: "there is an error on internal server.",
@@ -138,20 +171,23 @@ async function run() {
     });
 
     // put endpoint for update a todo.
-    app.put("/todos/:id", async (req, res) => {
+    app.put("/todos/:id/:uid", async (req, res) => {
       const id = req.params.id;
-      const data = req.body;
-      if (!id || !data) {
+      const uid = req.params.uid;
+      const todoData = req.body;
+      if (!id || !uid || !todoData) {
         res.status(400).send({
-          message: "Please provide id and data",
+          message: "Please provide id, uid and new data",
         });
       }
+      const user = { uid: uid };
       try {
-        const result = await todosCollection.updateOne(
-          { _id: new ObjectId(id) },
-          { $set: data }
-        );
-        if (result.matchedCount === 1) {
+        const result = await usersCollection.findOne(user);
+        const todo = result.todos.find((todo) => todo.id == id);
+        todo.todo = todoData.todo;
+        const update = { $set: { todos: result.todos } };
+        const result2 = await usersCollection.updateOne(user, update);
+        if (result2.matchedCount === 1) {
           res.status(200).send({
             message: "Item updated successfully",
           });
